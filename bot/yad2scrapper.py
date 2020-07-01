@@ -1,6 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 import io
+import logging
+
 class YadScrap:
     def __init__(self, url: str):
         self.url = url
@@ -14,9 +16,9 @@ class YadScrap:
 
     def _get_feed_items(self):
 
-        print(f"cookies before get items {requests.utils.dict_from_cookiejar(self.session.cookies)}")
+        logging.debug(f"cookies before get items {requests.utils.dict_from_cookiejar(self.session.cookies)}")
         page = self.session.get(self.url)
-        print(f"cookies after get items {requests.utils.dict_from_cookiejar(self.session.cookies)}")
+        logging.debug(f"cookies after get items {requests.utils.dict_from_cookiejar(self.session.cookies)}")
         soup = BeautifulSoup(page.text)
         feed = soup.find("div", {"class": "feed_list"})
         return feed.find_all("div", {"class": "feeditem table"})
@@ -31,7 +33,7 @@ class YadScrap:
                 img_io = io.BytesIO(img.content)
             except Exception as e:
                 img_io = ""
-                print(f"Exception occurred during fetching the image {e}")
+                logging.exception(f"Exception occurred during fetching the image {e}")
             try:
                 self.apartments[a_id] = {
                     "address": feed_item.find("span", {"class": "title"}).text.strip(),
@@ -41,7 +43,7 @@ class YadScrap:
                     "img": img_io
                 }
             except Exception as e:
-                print(f"Exception occurred during adding apartment {e}")
+                logging.exception(f"Exception occurred during adding apartment {e}")
 
     def check_for_news(self):
         feed_items = self._get_feed_items()
@@ -55,7 +57,7 @@ class YadScrap:
                     img_io = io.BytesIO(img.content)
                 except Exception as e:
                     img_io = ""
-                    print(f"Exception occurred during fetching the image {e}")
+                    logging.exception(f"Exception occurred during fetching the image {e}")
                 try:
                     news[a_id] = {
                         "address": feed_item.find("span", {"class": "title"}).text.strip(),
@@ -73,15 +75,18 @@ class YadScrap:
                         "img": img_io
                     }
                 except Exception as e:
-                    print(f"Exception occurred during adding new apartment {e}")
+                    logging.exception(f"Exception occurred during adding new apartment {e}")
             else:
-                if self.apartments[a_id]["price"] != feed_item.find("div", {"class": "price"}).text.strip():
-                    old_price = self.apartments[a_id]['price']
-                    self.apartments[a_id]['price'] = feed_item.find("div", {"class": "price"}).text.strip()
-                    news[a_id] = self.apartments[a_id]
-                    news[a_id]["reason"] = f"Price change from {old_price} to {self.apartments[a_id]['price']}"
+                try:
+                    if self.apartments[a_id]["price"] != feed_item.find("div", {"class": "price"}).text.strip():
+                        old_price = self.apartments[a_id]['price']
+                        self.apartments[a_id]['price'] = feed_item.find("div", {"class": "price"}).text.strip()
+                        news[a_id] = self.apartments[a_id]
+                        news[a_id]["reason"] = f"Price change from {old_price} to {self.apartments[a_id]['price']}"
+                except Exception as e:
+                    logging.exception(f"Exception occurred during adding changed apartment {e}")
             if len(news) > 6:
-                print("too match news!")
+                logging.info("too match news!")
                 return []
         return news
 
